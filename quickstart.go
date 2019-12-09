@@ -1,18 +1,22 @@
 package main
 
 import (
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/sheets/v4"
 )
+
+// This is based off Google tutorial
 
 // Retrieve a token, saves the token, then returns the generated client.
 func getClient(config *oauth2.Config) *http.Client {
@@ -89,20 +93,58 @@ func main() {
 
 	// Prints the email, last name and tags of residents in westport spreadsheet:
 	// spreadsheet id is in the URL, e.g. https://docs.google.com/spreadsheets/d/1wiQ8LIaUXnkpCfCdFEvSycmY590twbTuQCDYahVs99Q/edit#gid=1841356976
+	// First is HepTestOne
 	spreadsheetId := "1wiQ8LIaUXnkpCfCdFEvSycmY590twbTuQCDYahVs99Q"
-	readRange := "Entire data base!A2:D50"
-	resp, err := srv.Spreadsheets.Values.Get(spreadsheetId, readRange).Do()
+	// Second is Directory2019_workingCopy under westporter1 account
+	// spreadsheetId := "1Z-De3hCJwKRBWrTEB97QG7z7aVGysIWUJzYDIDzJMgk"
+	readRange := "Entire data base!A2:D5"
+	response, err := srv.Spreadsheets.Values.Get(spreadsheetId, readRange).Do()
 	if err != nil {
 		log.Fatalf("Unable to retrieve data from sheet: %v", err)
 	}
 
-	if len(resp.Values) == 0 {
+	type Tag struct {
+		Name string `json:"name,omitempty"`
+	}
+
+	type AudienceMember struct {
+		HashedEmail string `json:"id,omitempty"`
+		Email       string `json:"email_address,omitempty"`
+		Tags        []Tag  `json:"tags,omitempty"`
+	}
+
+	mailchimpUpload := []AudienceMember{}
+
+	if len(response.Values) == 0 {
 		fmt.Println("No data found.")
 	} else {
-		fmt.Println("Email, LastName, Tags")
-		for _, row := range resp.Values {
-			// Print columns A and E, which correspond to indices 0 and 4.
-			fmt.Printf("%s, %s: %s\n", row[0], row[2], row[3])
+		for _, row := range response.Values {
+			if row[0] == "" {
+				continue
+			}
+			member := AudienceMember{}
+			member.Email = row[0].(string)
+			emailHashing := md5.Sum([]byte(member.Email))
+			member.HashedEmail = fmt.Sprintf("%x", emailHashing)
+			// member.Tags = []Tag
+			// for _, tag := range row[3] {
+			// 	tag.Name = tag
+			// 	member.Tags = append(member.Tags, tag)
+			// }
+			// member.Tags = append(member.Tags, {Name: time.Now().Month().String()})
+			// TODO: Get each tag in a separate tag?
+			// OR better to gather the paids and update the segment all at once?
+			member.Tags = []Tag{
+				{Name: row[3].(string)},
+				{Name: time.Now().Month().String()},
+			}
+			mailchimpUpload = append(mailchimpUpload, member)
 		}
 	}
+	// fmt.Printf("%+v", mailchimpUpload)
+	payload, err := json.Marshal(mailchimpUpload)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	os.Stdout.Write(payload)
 }
