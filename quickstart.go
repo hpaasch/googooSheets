@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"golang.org/x/net/context"
@@ -115,6 +116,8 @@ func main() {
 
 	mailchimpUpload := []AudienceMember{}
 
+	updateDate := fmt.Sprintf("%s %v %v", time.Now().Month().String(), time.Now().Day(), time.Now().Year())
+
 	if len(response.Values) == 0 {
 		fmt.Println("No data found.")
 	} else {
@@ -126,17 +129,15 @@ func main() {
 			member.Email = row[0].(string)
 			emailHashing := md5.Sum([]byte(member.Email))
 			member.HashedEmail = fmt.Sprintf("%x", emailHashing)
-			// member.Tags = []Tag
-			// for _, tag := range row[3] {
-			// 	tag.Name = tag
-			// 	member.Tags = append(member.Tags, tag)
-			// }
-			// member.Tags = append(member.Tags, {Name: time.Now().Month().String()})
-			// TODO: Get each tag in a separate tag?
-			// OR better to gather the paids and update the segment all at once?
+
+			paidStatus := "Unpaid"
+			if strings.Contains(row[3].(string), "paid") {
+				paidStatus = "Paid"
+			}
+
 			member.Tags = []Tag{
-				{Name: row[3].(string)},
-				{Name: time.Now().Month().String()},
+				{Name: paidStatus},
+				{Name: updateDate},
 			}
 			mailchimpUpload = append(mailchimpUpload, member)
 		}
