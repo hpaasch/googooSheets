@@ -15,6 +15,8 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/sheets/v4"
+
+	"github.com/hanzoai/gochimp3"
 )
 
 // This is based off Google tutorial
@@ -74,6 +76,39 @@ func saveToken(path string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
+func sendToMailchimp(payload []byte) (string, error) {
+	// TODO: Use the payload!
+	fmt.Println("Gonna think about the chimp now")
+	apiKey := os.Getenv("MAILCHIMP_WESTPORT_KEY")
+	wcaListID := os.Getenv("MAILCHIMP_WESTPORT_LIST_ID")
+	hepID := os.Getenv("MAILCHIMP_HEP_MEMBER_MD5")
+	chimpClient := gochimp3.New(apiKey)
+	listDetails, err := chimpClient.GetList(wcaListID, nil)
+	if err != nil {
+		fmt.Println("Error getting list from The Chimp", err.Error())
+	}
+	fmt.Println("Westport List: \n", listDetails)
+	oneMember, err := listDetails.GetMember(hepID, nil)
+	if err != nil {
+		fmt.Println("Error getting member details from The Chimp", err.Error())
+	}
+	fmt.Println("One member details: \n", oneMember)
+	if oneMember.MemberRequest.EmailAddress == "hepaasch@gmail.com" {
+		fmt.Println("We got a live one")
+		req := &gochimp3.MemberRequest{
+			EmailAddress: "hepaasch@gmail.com",
+			Status:       "subscribed",
+			// MergeFields:  {"FNAME": "Dopey"},
+		}
+		updatedMember, err := listDetails.UpdateMember(hepID, req)
+		if err != nil {
+			fmt.Println("Error updating a member on The Chimp", err.Error())
+		}
+		fmt.Println("Updated member: \n", updatedMember)
+	}
+	return "", nil
+}
+
 func main() {
 	b, err := ioutil.ReadFile("credentials.json")
 	if err != nil {
@@ -95,9 +130,9 @@ func main() {
 	// Prints the email, last name and tags of residents in westport spreadsheet:
 	// spreadsheet id is in the URL, e.g. https://docs.google.com/spreadsheets/d/1wiQ8LIaUXnkpCfCdFEvSycmY590twbTuQCDYahVs99Q/edit#gid=1841356976
 	// First is HepTestOne
-	spreadsheetId := "1wiQ8LIaUXnkpCfCdFEvSycmY590twbTuQCDYahVs99Q"
+	spreadsheetId := os.Getenv("GOOGLESHEETS_HEPTESTONE")
 	// Second is Directory2019_workingCopy under westporter1 account
-	// spreadsheetId := "1Z-De3hCJwKRBWrTEB97QG7z7aVGysIWUJzYDIDzJMgk"
+	// spreadsheetId := os.Getenv("GOOGLESHEETS_WCA_DIRECTORY")
 	readRange := "Entire data base!A2:D5"
 	response, err := srv.Spreadsheets.Values.Get(spreadsheetId, readRange).Do()
 	if err != nil {
@@ -152,4 +187,5 @@ func main() {
 		fmt.Println("error:", err)
 	}
 	os.Stdout.Write(payload)
+	sendToMailchimp(payload)
 }
