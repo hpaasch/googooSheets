@@ -131,8 +131,12 @@ func main() {
 			member.HashedEmail = fmt.Sprintf("%x", emailHashing)
 
 			paidStatus := "Unpaid"
-			if strings.Contains(row[3].(string), "paid") {
-				paidStatus = "Paid"
+			// TODO: deal with empty Tags field.
+			if row[3].(string) != "" {
+				tagsFromDatabase := strings.ToLower(row[3].(string))
+				if strings.Contains(tagsFromDatabase, "paid") {
+					paidStatus = "Paid"
+				}
 			}
 
 			member.Tags = []Tag{
